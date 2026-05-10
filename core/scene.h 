@@ -1,0 +1,39 @@
+#ifndef CORE_SCENE_H
+#define CORE_SCENE_H
+
+#include "core/math.h"
+#include <stdint.h>
+
+#define MAX_SCENE_OBJECTS 256
+
+typedef enum {
+    SCENE_OBJ_NONE = 0,
+    SCENE_OBJ_RECT,
+    SCENE_OBJ_CUBE,
+    SCENE_OBJ_TRIANGLE,
+    SCENE_OBJ_GRID
+} SceneObjectType;
+
+typedef struct {
+    SceneObjectType type;
+    vec3 position;
+    vec3 scale;
+    vec3 rotation;  // 欧拉角，单位：度
+    vec3 color;
+    
+    char texture[64];
+    char model[64];
+    char comment[128];
+} SceneObject;
+
+typedef struct {
+    char name[64];
+    int version;
+    SceneObject objects[MAX_SCENE_OBJECTS];
+    int object_count;
+} Scene;
+
+int scene_load(Scene* scene, const char* json_path);
+void scene_clear(Scene* scene);
+
+#endif
