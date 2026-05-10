@@ -70,9 +70,11 @@ void engine_init(void) {
     last_frame = (float)glfwGetTime();
     running = true;
     LOG("汴京世界已就绪 - WASD移动，鼠标环顾");
+    LOG("当前功能：天空盒 + 基础光照 + 坐标轴指示器");
 }
 
 void engine_update(void) {
+    // 计算每帧时间差
     float current_frame = (float)glfwGetTime();
     delta_time = current_frame - last_frame;
     last_frame = current_frame;
@@ -84,13 +86,19 @@ void engine_update(void) {
         return;
     }
     
-    // 键盘输入
+    // ========== 键盘输入 ==========
     bool w_pressed = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
     bool a_pressed = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
     bool s_pressed = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
     bool d_pressed = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
     
-    // 鼠标输入
+    // 调试功能：按ESC退出
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        running = false;
+        return;
+    }
+    
+    // ========== 鼠标输入 ==========
     double current_mouse_x, current_mouse_y;
     glfwGetCursorPos(window, &current_mouse_x, &current_mouse_y);
     float xpos = (float)current_mouse_x;
@@ -103,10 +111,11 @@ void engine_update(void) {
     }
     
     float x_offset = xpos - last_mouse_x;
-    float y_offset = last_mouse_y - ypos;
+    float y_offset = last_mouse_y - ypos;  // Y轴取反
     last_mouse_x = xpos;
     last_mouse_y = ypos;
     
+    // 更新摄像机
     camera_process_mouse(&camera, x_offset, y_offset);
     camera_update(&camera, delta_time, w_pressed, a_pressed, s_pressed, d_pressed);
     
@@ -115,16 +124,23 @@ void engine_update(void) {
     float aspect_ratio = (float)width / (float)height;
     mat4 proj = mat4_perspective(45.0f, aspect_ratio, 0.1f, 100.0f);
     
-    // 渲染
-    glClearColor(0.53f, 0.81f, 0.92f, 1.0f);  // 天蓝色背景
+    // ========== 渲染 ==========
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // 黑色背景
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    // 绘制地面
+    // 设置光照（模拟下午的太阳）
+    renderer_set_light_dir(&renderer, 0.5f, -1.0f, -0.3f);
+    renderer_set_ambient(&renderer, 0.2f);
+    
+    // 1. 绘制天空盒（最先绘制，作为背景）
+    renderer_draw_skybox(&renderer, &view, &proj);
+    
+    // 2. 绘制地面
     renderer_draw_grid(&renderer, &view, &proj);
     
-    // 绘制建筑占位符
+    // 3. 绘制建筑占位符
     renderer_draw_rect(&renderer, -3.0f, 0.5f, -3.0f, 1.0f, 1.0f, 
-                      0.8f, 0.4f, 0.2f, &view, &proj);  // 小房子
+                      0.8f, 0.4f, 0.2f, &view, &proj);  // 橙色小房子
     
     renderer_draw_rect(&renderer, 2.0f, 1.0f, -2.0f, 1.5f, 2.0f, 
                       0.6f, 0.3f, 0.3f, &view, &proj);  // 红色大建筑
@@ -132,7 +148,11 @@ void engine_update(void) {
     renderer_draw_rect(&renderer, -2.0f, 0.3f, 3.0f, 2.0f, 0.6f, 
                       0.2f, 0.6f, 0.4f, &view, &proj);  // 紫色长建筑
     
-    // 用立即模式绘制三角形（调试用）
+    // 4. 绘制坐标轴
+    renderer_draw_axes(&renderer, &view, &proj);
+    
+    // 保留原来的三角形作为调试（使用立即模式）
+    // 注意：立即模式在现代OpenGL中已被弃用，这里仅用于调试
     glMatrixMode(GL_PROJECTION);
     glLoadMatrixf((float*)&proj);
     glMatrixMode(GL_MODELVIEW);
