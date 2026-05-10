@@ -1,0 +1,26 @@
+#ifndef CORE_MATH_H
+#define CORE_MATH_H
+
+typedef struct {
+    float x, y, z;
+} vec3;
+
+typedef struct {
+    float m[4][4];
+} mat4;
+
+/* 向量运算 */
+vec3 vec3_add(vec3 a, vec3 b);
+vec3 vec3_sub(vec3 a, vec3 b);
+vec3 vec3_scale(vec3 v, float s);
+float vec3_dot(vec3 a, vec3 b);
+vec3 vec3_normalize(vec3 v);
+vec3 vec3_cross(vec3 a, vec3 b);
+
+/* 矩阵运算 */
+mat4 mat4_identity(void);
+mat4 mat4_perspective(float fov, float aspect, float near, float far);
+mat4 mat4_lookat(vec3 eye, vec3 center, vec3 up);
+mat4 mat4_mul(mat4 a, mat4 b);
+
+#endif
