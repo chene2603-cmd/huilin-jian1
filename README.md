@@ -14,3 +14,7 @@ make
 
 ## 架构文档
 详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+## 依赖
+- CMake >= 3.16
+- C11编译器
+- [计划引入] GLFW, OpenGL, GLEW/GLAD
