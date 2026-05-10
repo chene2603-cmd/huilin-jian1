@@ -10,11 +10,11 @@ typedef struct {
 } Vector3;
 
 typedef struct {
-    int32_t x, z;       /* 世界网格坐标 */
+    int32_t x, z;
 } GridCoord;
 
 /* ========== 资源ID（蓝图：架构总规范） ========== */
-typedef uint32_t ResID;     /* 全局唯一资源标识符 */
+typedef uint32_t ResID;
 
 /* ========== 实体基础类型 ========== */
 typedef uint32_t EntityID;
