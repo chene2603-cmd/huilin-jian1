@@ -1,0 +1,76 @@
+#include "core/file.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+char* file_read_text(const char* path) {
+    FILE* f = fopen(path, "rb");
+    if (!f) { 
+        perror("file_read_text fopen"); 
+        return NULL; 
+    }
+    
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    
+    char* buf = (char*)malloc(sz + 1);
+    if (!buf) { 
+        fclose(f); 
+        perror("file_read_text malloc"); 
+        return NULL; 
+    }
+    
+    size_t rd = fread(buf, 1, sz, f);
+    if (rd != (size_t)sz) {
+        free(buf); 
+        fclose(f);
+        fprintf(stderr, "file_read_text: read %zu, expected %ld\n", rd, sz);
+        return NULL;
+    }
+    
+    buf[sz] = '\0';
+    fclose(f);
+    return buf;
+}
+
+unsigned char* file_read_binary(const char* path, size_t* out_size) {
+    FILE* f = fopen(path, "rb");
+    if (!f) { 
+        perror("file_read_binary fopen"); 
+        return NULL; 
+    }
+    
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    
+    unsigned char* buf = (unsigned char*)malloc(sz + 1);
+    if (!buf) { 
+        fclose(f); 
+        perror("file_read_binary malloc"); 
+        return NULL; 
+    }
+    
+    size_t rd = fread(buf, 1, sz, f);
+    if (rd != (size_t)sz) {
+        free(buf); 
+        fclose(f);
+        fprintf(stderr, "file_read_binary: read %zu, expected %ld\n", rd, sz);
+        return NULL;
+    }
+    
+    buf[sz] = '\0';
+    fclose(f);
+    
+    if (out_size) *out_size = sz;
+    return buf;
+}
+
+void file_free_text(char* data) { 
+    free(data); 
+}
+
+void file_free_binary(unsigned char* data) { 
+    free(data); 
+}
