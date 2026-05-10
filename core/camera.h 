@@ -1,0 +1,29 @@
+#ifndef CORE_CAMERA_H
+#define CORE_CAMERA_H
+
+#include "core/math.h"
+#include <stdbool.h>
+
+typedef struct {
+    // 位置与朝向
+    vec3 position;
+    vec3 front;
+    vec3 up;
+    vec3 right;
+    vec3 worldUp;
+    
+    // 欧拉角 (弧度制)
+    float yaw;
+    float pitch;
+    
+    // 控制参数
+    float moveSpeed;
+    float mouseSensitivity;
+} Camera;
+
+void camera_init(Camera* cam);
+void camera_update(Camera* cam, float delta_time, bool w, bool a, bool s, bool d);
+void camera_process_mouse(Camera* cam, float x_offset, float y_offset);
+mat4 camera_get_view_matrix(const Camera* cam);
+
+#endif
