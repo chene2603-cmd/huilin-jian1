@@ -1,6 +1,7 @@
 #include "engine/engine.h"
 #include "core/camera.h"
 #include "core/render.h"
+#include "core/scene.h"
 #include <stdio.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -11,6 +12,7 @@ static GLFWwindow* window = NULL;
 static bool running = false;
 static Camera camera;
 static Renderer renderer;
+static Scene current_scene;  // 新增
 static int width = 1280, height = 720;
 static float delta_time = 0.0f;
 static float last_frame = 0.0f;
@@ -26,7 +28,6 @@ void engine_init(void) {
         return;
     }
     
-    // 使用兼容模式，以便保留立即模式用于调试
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
@@ -39,9 +40,8 @@ void engine_init(void) {
     }
     
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);  // 开启垂直同步
+    glfwSwapInterval(1);
     
-    // 初始化GLEW
     glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK) {
         LOG("Failed to initialize GLEW");
@@ -49,7 +49,6 @@ void engine_init(void) {
         return;
     }
     
-    // 设置鼠标
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     double init_x, init_y;
     glfwGetCursorPos(window, &init_x, &init_y);
@@ -57,24 +56,24 @@ void engine_init(void) {
     last_mouse_y = (float)init_y;
     first_mouse = true;
     
-    // 初始化摄像机
     camera_init(&camera);
-    
-    // 初始化渲染器
     renderer_init(&renderer);
     
-    // OpenGL设置
+    // 初始化场景
+    scene_clear(&current_scene);
+    if (!scene_load(&current_scene, "scenes/test.json")) {
+        LOG("WARNING: Failed to load scene, using fallback objects");
+    }
+    
     glEnable(GL_DEPTH_TEST);
     glViewport(0, 0, width, height);
     
     last_frame = (float)glfwGetTime();
     running = true;
-    LOG("汴京世界已就绪 - WASD移动，鼠标环顾");
-    LOG("当前功能：天空盒 + 基础光照 + 坐标轴指示器");
+    LOG("汴京世界已就绪 - 数据驱动模式启动");
 }
 
 void engine_update(void) {
-    // 计算每帧时间差
     float current_frame = (float)glfwGetTime();
     delta_time = current_frame - last_frame;
     last_frame = current_frame;
@@ -86,19 +85,13 @@ void engine_update(void) {
         return;
     }
     
-    // ========== 键盘输入 ==========
+    // 键盘输入
     bool w_pressed = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
     bool a_pressed = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
     bool s_pressed = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
     bool d_pressed = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
     
-    // 调试功能：按ESC退出
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        running = false;
-        return;
-    }
-    
-    // ========== 鼠标输入 ==========
+    // 鼠标输入
     double current_mouse_x, current_mouse_y;
     glfwGetCursorPos(window, &current_mouse_x, &current_mouse_y);
     float xpos = (float)current_mouse_x;
@@ -111,11 +104,10 @@ void engine_update(void) {
     }
     
     float x_offset = xpos - last_mouse_x;
-    float y_offset = last_mouse_y - ypos;  // Y轴取反
+    float y_offset = last_mouse_y - ypos;
     last_mouse_x = xpos;
     last_mouse_y = ypos;
     
-    // 更新摄像机
     camera_process_mouse(&camera, x_offset, y_offset);
     camera_update(&camera, delta_time, w_pressed, a_pressed, s_pressed, d_pressed);
     
@@ -124,46 +116,22 @@ void engine_update(void) {
     float aspect_ratio = (float)width / (float)height;
     mat4 proj = mat4_perspective(45.0f, aspect_ratio, 0.1f, 100.0f);
     
-    // ========== 渲染 ==========
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // 黑色背景
+    // 渲染
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    // 设置光照（模拟下午的太阳）
+    // 设置光照
     renderer_set_light_dir(&renderer, 0.5f, -1.0f, -0.3f);
     renderer_set_ambient(&renderer, 0.2f);
     
-    // 1. 绘制天空盒（最先绘制，作为背景）
+    // 1. 绘制天空盒
     renderer_draw_skybox(&renderer, &view, &proj);
     
-    // 2. 绘制地面
-    renderer_draw_grid(&renderer, &view, &proj);
+    // 2. 绘制场景（完全数据驱动）
+    renderer_draw_scene(&renderer, &current_scene, &view, &proj);
     
-    // 3. 绘制建筑占位符
-    renderer_draw_rect(&renderer, -3.0f, 0.5f, -3.0f, 1.0f, 1.0f, 
-                      0.8f, 0.4f, 0.2f, &view, &proj);  // 橙色小房子
-    
-    renderer_draw_rect(&renderer, 2.0f, 1.0f, -2.0f, 1.5f, 2.0f, 
-                      0.6f, 0.3f, 0.3f, &view, &proj);  // 红色大建筑
-    
-    renderer_draw_rect(&renderer, -2.0f, 0.3f, 3.0f, 2.0f, 0.6f, 
-                      0.2f, 0.6f, 0.4f, &view, &proj);  // 紫色长建筑
-    
-    // 4. 绘制坐标轴
+    // 3. 绘制坐标轴
     renderer_draw_axes(&renderer, &view, &proj);
-    
-    // 保留原来的三角形作为调试（使用立即模式）
-    // 注意：立即模式在现代OpenGL中已被弃用，这里仅用于调试
-    glMatrixMode(GL_PROJECTION);
-    glLoadMatrixf((float*)&proj);
-    glMatrixMode(GL_MODELVIEW);
-    mat4 mv = mat4_mul(view, mat4_identity());
-    glLoadMatrixf((float*)&mv);
-    
-    glBegin(GL_TRIANGLES);
-    glColor3f(1.0f, 0.0f, 0.0f); glVertex3f(0.0f, 0.6f, 0.0f);
-    glColor3f(0.0f, 1.0f, 0.0f); glVertex3f(-0.3f, -0.3f, 0.0f);
-    glColor3f(0.0f, 0.0f, 1.0f); glVertex3f(0.3f, -0.3f, 0.0f);
-    glEnd();
     
     glfwSwapBuffers(window);
 }
