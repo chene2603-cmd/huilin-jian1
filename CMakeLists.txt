@@ -30,22 +30,36 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glew)
 
+# json-c
+include(FetchContent)
+FetchContent_Declare(
+    json-c
+    GIT_REPOSITORY https://github.com/json-c/json-c.git
+    GIT_TAG json-c-0.16-20220414
+)
+FetchContent_MakeAvailable(json-c)
+
 # 引擎库
 add_library(engine
     engine/engine.c
     engine/renderer.c
     core/math.c
     core/camera.c
+    core/file.c
+    core/json.c
+    core/scene.c
 )
 
 target_include_directories(engine PUBLIC
     ${CMAKE_SOURCE_DIR}
     ${glew_SOURCE_DIR}/include
+    ${json-c_SOURCE_DIR}
 )
 
 target_link_libraries(engine PUBLIC
     glfw
     ${CMAKE_DL_LIBS}
+    json-c
 )
 
 # 在Unix系统上链接额外的库
