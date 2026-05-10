@@ -1,0 +1,74 @@
+#include "core/scene.h"
+#include "core/json.h"
+#include <stdio.h>
+#include <string.h>
+
+static SceneObjectType string_to_type(const char* str) {
+    if (!str) return SCENE_OBJ_NONE;
+    
+    if (strcmp(str, "rect") == 0) return SCENE_OBJ_RECT;
+    if (strcmp(str, "cube") == 0) return SCENE_OBJ_CUBE;
+    if (strcmp(str, "triangle") == 0) return SCENE_OBJ_TRIANGLE;
+    if (strcmp(str, "grid") == 0) return SCENE_OBJ_GRID;
+    
+    return SCENE_OBJ_NONE;
+}
+
+int scene_load(Scene* scene, const char* json_path) {
+    if (!scene) return 0;
+    
+    struct json_object* root = json_parse_file(json_path);
+    if (!root) {
+        fprintf(stderr, "Failed to load scene: %s\n", json_path);
+        return 0;
+    }
+    
+    scene_clear(scene);
+    
+    struct json_object* scene_obj = json_get_object(root, "scene");
+    if (scene_obj) {
+        const char* name = json_get_string(scene_obj, "name");
+        strncpy(scene->name, name, sizeof(scene->name) - 1);
+        scene->version = (int)json_get_number(scene_obj, "version");
+    }
+    
+    struct json_object* objects = json_get_object(root, "objects");
+    if (objects && json_object_is_type(objects, json_type_array)) {
+        int count = json_object_array_length(objects);
+        
+        for (int i = 0; i < count && scene->object_count < MAX_SCENE_OBJECTS; i++) {
+            struct json_object* obj = json_object_array_get_idx(objects, i);
+            SceneObject* so = &scene->objects[scene->object_count];
+            
+            const char* type_str = json_get_string(obj, "type");
+            so->type = string_to_type(type_str);
+            if (so->type == SCENE_OBJ_NONE) {
+                fprintf(stderr, "Unknown object type: %s\n", type_str);
+                continue;
+            }
+            
+            json_get_vec3(obj, "position", &so->position.x, &so->position.y, &so->position.z);
+            json_get_vec3(obj, "scale", &so->scale.x, &so->scale.y, &so->scale.z);
+            json_get_vec3(obj, "color", &so->color.x, &so->color.y, &so->color.z);
+            
+            if (!json_get_vec3(obj, "rotation", &so->rotation.x, &so->rotation.y, &so->rotation.z)) {
+                so->rotation = (vec3){0.0f, 0.0f, 0.0f};
+            }
+            
+            const char* comment = json_get_string(obj, "comment");
+            strncpy(so->comment, comment, sizeof(so->comment) - 1);
+            
+            scene->object_count++;
+        }
+    }
+    
+    json_free(root);
+    printf("Loaded scene '%s' with %d objects\n", scene->name, scene->object_count);
+    return 1;
+}
+
+void scene_clear(Scene* scene) {
+    if (!scene) return;
+    memset(scene, 0, sizeof(Scene));
+    scene->version = 1;
+}
