@@ -12,7 +12,6 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-# ====== 新增：自动获取 GLFW ======
 include(FetchContent)
 FetchContent_Declare(
     glfw
@@ -20,17 +19,17 @@ FetchContent_Declare(
     GIT_TAG 3.4
 )
 FetchContent_MakeAvailable(glfw)
-# =================================
 
 add_library(engine
     engine/engine.c
+    core/math.c      # 新增
+    core/camera.c    # 新增
 )
 
 target_include_directories(engine PUBLIC
     ${CMAKE_SOURCE_DIR}
 )
 
-# 引擎链接 GLFW
 target_link_libraries(engine PUBLIC glfw)
 
 add_executable(huilin
