@@ -22,8 +22,8 @@ FetchContent_MakeAvailable(glfw)
 
 add_library(engine
     engine/engine.c
-    core/math.c      # 新增
-    core/camera.c    # 新增
+    core/math.c
+    core/camera.c
 )
 
 target_include_directories(engine PUBLIC
