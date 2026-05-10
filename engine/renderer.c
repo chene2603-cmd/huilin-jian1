@@ -1,4 +1,5 @@
 #include "core/render.h"
+#include "core/scene.h"
 #include <GL/glew.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +8,7 @@
 
 #define LOG(msg) printf("[Renderer] %s\n", msg)
 
-// ========== 主着色器（带光照） ==========
+// ========== 着色器源码 ==========
 static const char* vertex_shader_src =
     "#version 330 core\n"
     "layout(location = 0) in vec3 aPos;\n"
@@ -40,7 +41,7 @@ static const char* fragment_shader_src =
     "    FragColor = vec4(uColor * lighting, 1.0);\n"
     "}\n";
 
-// ========== 天空盒着色器 ==========
+// 天空盒着色器
 static const char* sky_vertex_src =
     "#version 330 core\n"
     "layout(location = 0) in vec3 aPos;\n"
@@ -51,7 +52,7 @@ static const char* sky_vertex_src =
     "    vTexCoord = aPos;\n"
     "    mat4 viewNoTrans = mat4(mat3(uView));\n"
     "    vec4 pos = uProj * viewNoTrans * vec4(aPos, 1.0);\n"
-    "    gl_Position = pos.xyww;\n"  // xyww 确保深度测试通过
+    "    gl_Position = pos.xyww;\n"
     "}\n";
 
 static const char* sky_fragment_src =
@@ -60,21 +61,18 @@ static const char* sky_fragment_src =
     "out vec4 FragColor;\n"
     "void main() {\n"
     "    float h = normalize(vTexCoord).y;\n"
-    "    vec3 topColor = vec3(0.4, 0.6, 0.9);      // 顶部: 天蓝色\n"
-    "    vec3 horizonColor = vec3(0.7, 0.8, 0.9);  // 地平线: 浅蓝色\n"
-    "    vec3 groundColor = vec3(0.3, 0.3, 0.2);   // 底部: 地面色\n"
-    "    \n"
+    "    vec3 topColor = vec3(0.4, 0.6, 0.9);\n"
+    "    vec3 horizonColor = vec3(0.7, 0.8, 0.9);\n"
+    "    vec3 groundColor = vec3(0.3, 0.3, 0.2);\n"
     "    float t = smoothstep(-0.1, 0.3, h);\n"
     "    vec3 sky = mix(horizonColor, topColor, t);\n"
-    "    \n"
-    "    // 如果低于地平线，混合地面色\n"
     "    if (h < 0.0) {\n"
     "        sky = mix(groundColor, horizonColor, (h + 0.5) * 2.0);\n"
     "    }\n"
     "    FragColor = vec4(sky, 1.0);\n"
     "}\n";
 
-// ========== 坐标轴着色器 ==========
+// 坐标轴着色器
 static const char* axis_vertex_src =
     "#version 330 core\n"
     "layout(location = 0) in vec3 aPos;\n"
@@ -95,7 +93,7 @@ static const char* axis_fragment_src =
     "    FragColor = vec4(vColor, 1.0);\n"
     "}\n";
 
-// 辅助函数：编译着色器
+// 编译着色器
 static unsigned int compile_shader(const char* src, unsigned int type) {
     unsigned int shader = glCreateShader(type);
     glShaderSource(shader, 1, &src, NULL);
@@ -111,7 +109,7 @@ static unsigned int compile_shader(const char* src, unsigned int type) {
     return shader;
 }
 
-// 辅助函数：创建着色器程序
+// 创建着色器程序
 static unsigned int create_program(const char* vs_src, const char* fs_src) {
     unsigned int vs = compile_shader(vs_src, GL_VERTEX_SHADER);
     unsigned int fs = compile_shader(fs_src, GL_FRAGMENT_SHADER);
@@ -140,7 +138,6 @@ static void generate_sphere_vertices(float radius, int stacks, int slices,
             float theta1 = 2.0f * (float)M_PI * j / slices;
             float theta2 = 2.0f * (float)M_PI * (j + 1) / slices;
             
-            // 球面上的四个点
             float x1 = radius * sinf(phi1) * cosf(theta1);
             float y1 = radius * cosf(phi1);
             float z1 = radius * sinf(phi1) * sinf(theta1);
@@ -157,7 +154,6 @@ static void generate_sphere_vertices(float radius, int stacks, int slices,
             float y4 = radius * cosf(phi1);
             float z4 = radius * sinf(phi1) * sinf(theta2);
             
-            // 两个三角形组成一个四边形
             float tri1[] = {x1, y1, z1, x2, y2, z2, x3, y3, z3};
             float tri2[] = {x1, y1, z1, x3, y3, z3, x4, y4, z4};
             
@@ -173,25 +169,22 @@ static void generate_sphere_vertices(float radius, int stacks, int slices,
 void renderer_init(Renderer* r) {
     LOG("Initializing renderer");
     
-    // 检查GLEW是否已初始化
     if (glewInit() != GLEW_OK) {
         LOG("Failed to initialize GLEW in renderer");
         return;
     }
     
-    // 创建着色器程序
     r->shader_program = create_program(vertex_shader_src, fragment_shader_src);
     r->sky_shader = create_program(sky_vertex_src, sky_fragment_src);
     r->axis_shader = create_program(axis_vertex_src, axis_fragment_src);
     
-    // 设置默认光照参数
     r->light_dir = (vec3){0.5f, -1.0f, -0.3f};
     r->ambient_strength = 0.2f;
     
     // ========== 1. 地面网格 (10x10棋盘格) ==========
     const int grid_size = 10;
-    int vertex_count = grid_size * grid_size * 6;  // 每个格子2个三角形
-    float* grid_vertices = (float*)malloc(vertex_count * 6 * sizeof(float));  // 位置+法线
+    int vertex_count = grid_size * grid_size * 6;
+    float* grid_vertices = (float*)malloc(vertex_count * 6 * sizeof(float));
     int idx = 0;
     
     for (int ix = 0; ix < grid_size; ix++) {
@@ -201,8 +194,6 @@ void renderer_init(Renderer* r) {
             float x1 = x0 + 1.0f;
             float z1 = z0 + 1.0f;
             
-            // 位置 (x,y,z) + 法线 (0,1,0)
-            // 三角形1
             grid_vertices[idx++] = x0; grid_vertices[idx++] = 0.0f; grid_vertices[idx++] = z0;
             grid_vertices[idx++] = 0.0f; grid_vertices[idx++] = 1.0f; grid_vertices[idx++] = 0.0f;
             
@@ -212,7 +203,6 @@ void renderer_init(Renderer* r) {
             grid_vertices[idx++] = x1; grid_vertices[idx++] = 0.0f; grid_vertices[idx++] = z1;
             grid_vertices[idx++] = 0.0f; grid_vertices[idx++] = 1.0f; grid_vertices[idx++] = 0.0f;
             
-            // 三角形2
             grid_vertices[idx++] = x0; grid_vertices[idx++] = 0.0f; grid_vertices[idx++] = z0;
             grid_vertices[idx++] = 0.0f; grid_vertices[idx++] = 1.0f; grid_vertices[idx++] = 0.0f;
             
@@ -240,7 +230,6 @@ void renderer_init(Renderer* r) {
     
     // ========== 2. 矩形 (1x1) ==========
     float rect_vertices[] = {
-        // 位置              // 法线 (朝前)
         0.0f, 1.0f, 0.0f,   0.0f, 0.0f, 1.0f,
         1.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,
         0.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,
@@ -260,7 +249,24 @@ void renderer_init(Renderer* r) {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
     
-    // ========== 3. 天空盒 (球体) ==========
+    // ========== 3. 三角形VAO (新增) ==========
+    float tri_vertices[] = {
+        0.0f, 0.5f, 0.0f,   0.0f, 0.0f, 1.0f,
+       -0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f,
+        0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f
+    };
+    
+    glGenVertexArrays(1, &r->tri_vao);
+    glGenBuffers(1, &r->tri_vbo);
+    glBindVertexArray(r->tri_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, r->tri_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(tri_vertices), tri_vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    
+    // ========== 4. 天空盒 (球体) ==========
     float* sky_vertices = NULL;
     generate_sphere_vertices(50.0f, 16, 32, &sky_vertices, &r->sky_vertex_count);
     
@@ -274,17 +280,14 @@ void renderer_init(Renderer* r) {
     
     free(sky_vertices);
     
-    // ========== 4. 坐标轴 ==========
+    // ========== 5. 坐标轴 ==========
     float axis_vertices[] = {
-        // X轴 (红色)
         0.0f, 0.0f, 0.0f,   1.0f, 0.0f, 0.0f,
         10.0f, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f,
         
-        // Y轴 (绿色)
         0.0f, 0.0f, 0.0f,   0.0f, 1.0f, 0.0f,
         0.0f, 10.0f, 0.0f,  0.0f, 1.0f, 0.0f,
         
-        // Z轴 (蓝色)
         0.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,
         0.0f, 0.0f, 10.0f,  0.0f, 0.0f, 1.0f
     };
@@ -299,7 +302,6 @@ void renderer_init(Renderer* r) {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
     
-    // 解绑
     glBindVertexArray(0);
     LOG("Renderer initialized successfully");
 }
@@ -308,20 +310,17 @@ void renderer_init(Renderer* r) {
 void renderer_draw_grid(Renderer* r, const mat4* view, const mat4* proj) {
     glUseProgram(r->shader_program);
     
-    // 传递矩阵
     mat4 model = mat4_identity();
     glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uModel"), 1, GL_FALSE, (float*)&model);
     glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uView"), 1, GL_FALSE, (float*)view);
     glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uProj"), 1, GL_FALSE, (float*)proj);
     
-    // 传递光照参数
     glUniform3f(glGetUniformLocation(r->shader_program, "uLightDir"), 
                 r->light_dir.x, r->light_dir.y, r->light_dir.z);
     glUniform1f(glGetUniformLocation(r->shader_program, "uAmbient"), r->ambient_strength);
     
     glBindVertexArray(r->grid_vao);
     
-    // 绘制每个格子并设置颜色
     int grid_size = 10;
     for (int ix = 0; ix < grid_size; ix++) {
         for (int iz = 0; iz < grid_size; iz++) {
@@ -338,7 +337,6 @@ void renderer_draw_rect(Renderer* r, float x, float y, float z, float w, float h
                        float red, float green, float blue, const mat4* view, const mat4* proj) {
     glUseProgram(r->shader_program);
     
-    // 构建模型矩阵（缩放 + 平移）
     mat4 scale = {0};
     scale.m[0][0] = w;
     scale.m[1][1] = h;
@@ -356,32 +354,63 @@ void renderer_draw_rect(Renderer* r, float x, float y, float z, float w, float h
     
     mat4 model = mat4_mul(translate, scale);
     
-    // 传递矩阵
     glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uModel"), 1, GL_FALSE, (float*)&model);
     glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uView"), 1, GL_FALSE, (float*)view);
     glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uProj"), 1, GL_FALSE, (float*)proj);
     
-    // 传递光照参数
     glUniform3f(glGetUniformLocation(r->shader_program, "uLightDir"), 
                 r->light_dir.x, r->light_dir.y, r->light_dir.z);
     glUniform1f(glGetUniformLocation(r->shader_program, "uAmbient"), r->ambient_strength);
     
-    // 设置颜色
     glUniform3f(glGetUniformLocation(r->shader_program, "uColor"), red, green, blue);
     
-    // 绘制
     glBindVertexArray(r->rect_vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
+// 绘制三角形 (新增函数)
+void renderer_draw_triangle(Renderer* r, float x, float y, float z, 
+                           float sx, float sy, float red, float green, float blue,
+                           const mat4* view, const mat4* proj) {
+    glUseProgram(r->shader_program);
+    
+    mat4 scale = {0};
+    scale.m[0][0] = sx;
+    scale.m[1][1] = sy;
+    scale.m[2][2] = 1.0f;
+    scale.m[3][3] = 1.0f;
+    
+    mat4 translate = {0};
+    translate.m[0][0] = 1.0f;
+    translate.m[1][1] = 1.0f;
+    translate.m[2][2] = 1.0f;
+    translate.m[3][3] = 1.0f;
+    translate.m[3][0] = x;
+    translate.m[3][1] = y;
+    translate.m[3][2] = z;
+    
+    mat4 model = mat4_mul(translate, scale);
+    
+    glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uModel"), 1, GL_FALSE, (float*)&model);
+    glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uView"), 1, GL_FALSE, (float*)view);
+    glUniformMatrix4fv(glGetUniformLocation(r->shader_program, "uProj"), 1, GL_FALSE, (float*)proj);
+    
+    glUniform3f(glGetUniformLocation(r->shader_program, "uLightDir"), 
+                r->light_dir.x, r->light_dir.y, r->light_dir.z);
+    glUniform1f(glGetUniformLocation(r->shader_program, "uAmbient"), r->ambient_strength);
+    
+    glUniform3f(glGetUniformLocation(r->shader_program, "uColor"), red, green, blue);
+    
+    glBindVertexArray(r->tri_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
 // 绘制天空盒
 void renderer_draw_skybox(Renderer* r, const mat4* view, const mat4* proj) {
-    // 禁用深度写入，天空盒永远在最远处
     glDepthMask(GL_FALSE);
     
     glUseProgram(r->sky_shader);
     
-    // 传递矩阵（移除平移部分，使天空盒跟随摄像机旋转但不跟随位置）
     mat4 view_no_trans = *view;
     view_no_trans.m[3][0] = 0.0f;
     view_no_trans.m[3][1] = 0.0f;
@@ -393,7 +422,6 @@ void renderer_draw_skybox(Renderer* r, const mat4* view, const mat4* proj) {
     glBindVertexArray(r->sky_vao);
     glDrawArrays(GL_TRIANGLES, 0, r->sky_vertex_count);
     
-    // 恢复深度写入
     glDepthMask(GL_TRUE);
 }
 
@@ -407,9 +435,44 @@ void renderer_draw_axes(Renderer* r, const mat4* view, const mat4* proj) {
     
     glBindVertexArray(r->axis_vao);
     
-    // 绘制三条线
     for (int i = 0; i < 3; i++) {
         glDrawArrays(GL_LINES, i * 2, 2);
+    }
+}
+
+// 场景渲染 (新增函数)
+void renderer_draw_scene(Renderer* r, const Scene* scene, const mat4* view, const mat4* proj) {
+    if (!scene || !r) return;
+    
+    for (int i = 0; i < scene->object_count; i++) {
+        const SceneObject* obj = &scene->objects[i];
+        
+        switch (obj->type) {
+            case SCENE_OBJ_RECT:
+            case SCENE_OBJ_CUBE:
+                renderer_draw_rect(r, 
+                    obj->position.x, obj->position.y, obj->position.z,
+                    obj->scale.x, obj->scale.y,
+                    obj->color.x, obj->color.y, obj->color.z,
+                    view, proj);
+                break;
+                
+            case SCENE_OBJ_TRIANGLE:
+                renderer_draw_triangle(r,
+                    obj->position.x, obj->position.y, obj->position.z,
+                    obj->scale.x, obj->scale.y,
+                    obj->color.x, obj->color.y, obj->color.z,
+                    view, proj);
+                break;
+                
+            case SCENE_OBJ_GRID:
+                renderer_draw_grid(r, view, proj);
+                break;
+                
+            default:
+                fprintf(stderr, "WARNING: Unknown object type: %d\n", obj->type);
+                break;
+        }
     }
 }
 
@@ -429,6 +492,8 @@ void renderer_shutdown(Renderer* r) {
     glDeleteBuffers(1, &r->grid_vbo);
     glDeleteVertexArrays(1, &r->rect_vao);
     glDeleteBuffers(1, &r->rect_vbo);
+    glDeleteVertexArrays(1, &r->tri_vao);
+    glDeleteBuffers(1, &r->tri_vbo);
     glDeleteVertexArrays(1, &r->sky_vao);
     glDeleteBuffers(1, &r->sky_vbo);
     glDeleteVertexArrays(1, &r->axis_vao);
